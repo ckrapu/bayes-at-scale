@@ -1,5 +1,9 @@
 folium
+geemap
+geopandas
 ipykernel
+matplotlib
 numpyro
 pandas
 pyarrow
+scikit-learn

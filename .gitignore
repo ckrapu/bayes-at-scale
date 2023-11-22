@@ -4,3 +4,20 @@
 *.csv
 *.rda
 *.pkl
+*.zip
+*.xlsx
+*.cpg
+*.pdf
+*.xml
+*.xls
+
+# Shapefile filetypes
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.fbn
+*.fbx
+
