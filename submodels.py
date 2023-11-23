@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from scipy.interpolate import BSpline
 
 
-def build_bym(geo_idx, geo_adj_matrix=None):
+def build_bym(geo_idx, geo_adj_matrix=None, geo_covariates=None):
     '''
     This code builds the Besag-York-Mollie model for random effects balanced
     between spatially smoothed and independent geo unit-level effects. See
@@ -44,6 +44,21 @@ def build_bym(geo_idx, geo_adj_matrix=None):
     with numpyro.plate('geo', n_geos):
         geo_effect_ind = numpyro.sample('geo_effect_ind', dist.Normal(0., 1.))
 
+    if geo_covariates is not None:
+        # This part of the code allows the random intercept per geo to be a function of covariates
+        # expressed at the geo level. 
+        _, p = geo_covariates.shape
+
+        # Scale parameters and coefficients for the covariates
+        sigma_covariates = numpyro.sample('sigma_covariates', dist.HalfNormal(1))
+        geo_coefs  = numpyro.sample('geo_coefs', dist.Normal(jnp.zeros(p), sigma_covariates*jnp.ones(p)))
+
+        # Create the covariate effect with a dot product
+        # for an (n,p) matrix of covariates and a (p,) vector of coefficients
+        covariate_effect = jnp.dot(geo_covariates, geo_coefs)
+    else:
+        covariate_effect = 0.
+
     # Here, we use the representation of the per-geo effect as the sum of an independent
     # and a spatially correlated vector. Rather than use two separate scale parameters (one for each),
     # we use a better parameterization in terms of a single scale parameter and a mixing ratio.
@@ -64,6 +79,9 @@ def build_bym(geo_idx, geo_adj_matrix=None):
 
     else:
         geo_effect = geo_effect_ind * geo_effect_scale
+
+    # Add the covariate effect
+    geo_effect = geo_effect + covariate_effect
 
     return geo_effect[geo_idx]
 
