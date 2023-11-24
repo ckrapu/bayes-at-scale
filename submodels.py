@@ -13,10 +13,13 @@ import jax.numpy as jnp
 from scipy.interpolate import BSpline
 
 
-def build_bym(geo_idx, geo_adj_matrix=None):
+def build_bym(geo_idx, geo_adj_matrix=None, geo_covariates=None):
     '''
     This code builds the Besag-York-Mollie model for random effects balanced
-    between spatially smoothed and independent geo unit-level effects.
+    between spatially smoothed and independent geo unit-level effects. See
+    these links for more details:
+    http://www.stat.columbia.edu/~gelman/research/published/bym_article_SSTEproof.pdf
+    https://arxiv.org/pdf/1403.4630v4.pdf
 
     Arguments:
     ----------
@@ -32,33 +35,53 @@ def build_bym(geo_idx, geo_adj_matrix=None):
         Distribution object representing the random effect for each geo unit.
     '''        
 
-    # Hyperparameters for the geo random effect
-    sigma_geo_ind = numpyro.sample('sigma_geo_ind', dist.HalfNormal(1))
-    sigma_geo_car  = numpyro.sample('sigma_geo_car', dist.HalfNormal(1))
-
     # Random effect for each geo
     # If we have adjacency matrix, use conditional autogression
     # Otherwise, use independent Gaussian
     n_geos = np.max(geo_idx) + 1
 
+    geo_effect_scale = numpyro.sample('geo_effect_scale', dist.HalfNormal(1))
     with numpyro.plate('geo', n_geos):
-        geo_effect_ind = numpyro.sample('geo_effect_ind', dist.Normal(0., sigma_geo_ind))
+        geo_effect_ind = numpyro.sample('geo_effect_ind', dist.Normal(0., 1.))
 
-    geo_effect = geo_effect_ind
+    if geo_covariates is not None:
+        # This part of the code allows the random intercept per geo to be a function of covariates
+        # expressed at the geo level. 
+        _, p = geo_covariates.shape
 
+        # Scale parameters and coefficients for the covariates
+        sigma_covariates = numpyro.sample('sigma_covariates', dist.HalfNormal(1))
+        geo_coefs  = numpyro.sample('geo_coefs', dist.Normal(jnp.zeros(p), sigma_covariates*jnp.ones(p)))
+
+        # Create the covariate effect with a dot product
+        # for an (n,p) matrix of covariates and a (p,) vector of coefficients
+        covariate_effect = jnp.dot(geo_covariates, geo_coefs)
+    else:
+        covariate_effect = 0.
+
+    # Here, we use the representation of the per-geo effect as the sum of an independent
+    # and a spatially correlated vector. Rather than use two separate scale parameters (one for each),
+    # we use a better parameterization in terms of a single scale parameter and a mixing ratio.
     if geo_adj_matrix is not None:
 
         # Check to make sure that the adjacency matrix is square, symmetric, and has no elements on the diagonal
         assert geo_adj_matrix.shape[0] == geo_adj_matrix.shape[1]
         assert np.allclose(geo_adj_matrix.diagonal(), 0)
 
+        mixing_ratio = numpyro.sample('mixing_ratio', dist.Beta(1, 1))
+
          # Spatial autocorrelation parameter which needs to reside in (0,1)
         rho = numpyro.sample('rho', dist.Beta(2, 2))
-        car_precision = sigma_geo_car**-2
-        geo_effect_car = numpyro.sample('geo_effect_car', dist.CAR(0., rho, car_precision, geo_adj_matrix, is_sparse=True))
+        geo_effect_car = numpyro.sample('geo_effect_car', dist.CAR(0., rho, 1., geo_adj_matrix, is_sparse=True))
 
         # Combine the two effects
-        geo_effect += geo_effect_car
+        geo_effect = ((1.-mixing_ratio)**0.5 * geo_effect_ind + (mixing_ratio **0.5) * geo_effect_car) * geo_effect_scale
+
+    else:
+        geo_effect = geo_effect_ind * geo_effect_scale
+
+    # Add the covariate effect
+    geo_effect = geo_effect + covariate_effect
 
     return geo_effect[geo_idx]
 
@@ -106,7 +129,7 @@ def build_grw(times):
         Distribution object representing the random effect for each time period.
     '''
 
-     # Gaussian random walk effect for time
+    # Gaussian random walk effect for time
     # Assumes a discrete grid of timepoints
     n_timesteps = int(np.max(times) + 1)
     sigma_grw   = numpyro.sample('sigma_grw', dist.HalfNormal(1))
@@ -158,7 +181,7 @@ def build_spline(x, n_knots, degree, n_grid_pts=100):
     # which would be relatively tedious.
     spline_grid       = np.quantile(x, np.linspace(0, 1, n_grid_pts))
     spline_grid_basis = get_basis(spline_grid)
-    spline_grid_eval  = numpyro.deterministic("spline", jnp.dot(spline_grid_basis, spline_coefs))
+    _  = numpyro.deterministic("spline", jnp.dot(spline_grid_basis, spline_coefs))
     
     return spline_term
     
