@@ -10,7 +10,6 @@
 *.pdf
 *.xml
 *.xls
-*.png
 
 # Shapefile filetypes
 *.shp
