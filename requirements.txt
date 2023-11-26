@@ -1,3 +1,4 @@
+arviz
 folium
 geemap
 geopandas
