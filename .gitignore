@@ -10,6 +10,7 @@
 *.pdf
 *.xml
 *.xls
+tex/*
 
 # Shapefile filetypes
 *.shp
@@ -20,4 +21,5 @@
 *.sbx
 *.fbn
 *.fbx
+*.pptx
 
