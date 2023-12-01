@@ -3,7 +3,7 @@ import location
 import numpy as np
 
 
-def plot_cities_with_folium(city_df, adj_graph, lat_min, lat_max, lon_min, lon_max):
+def plot_cities_with_folium(city_df, adj_graph, lat_min, lat_max, lon_min, lon_max, add_city_labels=True, add_dist_labels=True):
     # Calculate the center of the map
     center_lat = (lat_min + lat_max) / 2
     center_lon = (lon_min + lon_max) / 2
@@ -24,15 +24,16 @@ def plot_cities_with_folium(city_df, adj_graph, lat_min, lat_max, lon_min, lon_m
     
 
     # Add bolded text for each city
-    for _, row in filtered_cities.iterrows():
-        folium.map.Marker(
-            [row['lat'], row['long']],
-            icon=folium.DivIcon(
-                icon_size=(150,36),
-                icon_anchor=(0,0),
-                html=f'<div style="font-size: 12pt; font-weight: bold">{row["city-state"].split(",")[0].split("(")[0]}</div>',
-                )
-        ).add_to(m)
+    if add_city_labels:
+        for _, row in filtered_cities.iterrows():
+            folium.map.Marker(
+                [row['lat'], row['long']],
+                icon=folium.DivIcon(
+                    icon_size=(150,36),
+                    icon_anchor=(0,0),
+                    html=f'<div style="font-size: 12pt; font-weight: bold">{row["city-state"].split(",")[0].split("(")[0]}</div>',
+                    )
+            ).add_to(m)
 
     # Draw lines between adjacent cities
     cx, cy = sub_adj_graph.nonzero()
@@ -58,16 +59,16 @@ def plot_cities_with_folium(city_df, adj_graph, lat_min, lat_max, lon_min, lon_m
                 text_rotate_angle -= 180
             elif text_rotate_angle < -90:
                 text_rotate_angle += 180
-
-            folium.map.Marker(
-                [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
-                icon=folium.DivIcon(
-                    icon_size=(150,36),
-                    icon_anchor=(0,0),
-                    html=f'<div style="font-size: 8pt; ">{dist:.0f} km</div>',
-                    )
-                    
-            ).add_to(m)
+            if add_dist_labels:
+                folium.map.Marker(
+                    [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
+                    icon=folium.DivIcon(
+                        icon_size=(150,36),
+                        icon_anchor=(0,0),
+                        html=f'<div style="font-size: 8pt; ">{dist:.0f} km</div>',
+                        )
+                        
+                ).add_to(m)
 
     # Add markers for each city
     for _, row in filtered_cities.iterrows():
