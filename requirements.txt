@@ -8,3 +8,4 @@ numpyro
 pandas
 pyarrow
 scikit-learn
+watermark
